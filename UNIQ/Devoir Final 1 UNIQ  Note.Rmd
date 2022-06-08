@@ -1,0 +1,16 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+Avec les données du fichier des aggrégats monétaires de la BRH, réaliser ce travail:
+
+1) Realiser ce travail de recherche sur Rmarkdown
+Choisissez trois variables et verifier si elles sont stationnaires en niveau ou en différence première ou deuxième.
+
+2)Verifier le sens de la causalite, au sens de Granger, entre ces trois variables.
+
+3) Realiser une regression lineaire qui tient compte des resultats des tests de causalite.
+
+4) Il faut avoir une introduction, quelques phrases qui explique, dans le developpement, ce que vous etes en train de faire., et une conclusion. Il ne faut pas faire apparaitre les codes dans le fichier word. Attention. Le devoir doit etre realise sur Rmarkdown et executer en Word.
+5) Soumettre le lien Github du projet.
