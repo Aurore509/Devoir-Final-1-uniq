@@ -1,0 +1,214 @@
+---
+title: "Devoir Final 1"
+author: "Pierre-Louis Marthe Aurore"
+date: '2022-05-30'
+output:
+  word_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Introduction
+
+Dans le cadre du cours informatique pour Science Sociales, il etait demander de realiser une projet sur Rmarkdawn, ensuite de l'executer sur word.
+
+Pour commencer, nous devrions choisir trois variables de notre base de donne " Aggregat monetaire BRH". Ensuite, on va tester la stationarite de ces trois variables, ce qui revient a dire si ces variables sont dependant les uns aux autres sur un long periode. En d'autres mots, si la variables MEC augmente sur n periode , est-ce que la variable BMGOURDE ou BMDOLLARS augmentera au meme rythme sur cette meme periode.
+
+Tout au long de ce travail, nous allons realiser des tests qui determineront une relation entre les trois variables. Voici la liste des package que nous auront a utiliser:
+
+library(tidyverse)
+library(readxl)
+library(tseries)
+library(lmtest)
+library(dplyr)
+library(ggplot2)
+library(aTSA)
+library(dataseries)
+
+
+```{r, message=FALSE, warning=FALSE, echo=FALSE}
+library(tidyverse)
+library(readxl)
+library(tseries)
+library(lmtest)
+library(dplyr)
+library(ggplot2)
+library(aTSA)
+library(dataseries)
+
+```
+
+## Importation de donnees et Nettoyage du Dataframe
+
+Nous allons importer les donnes du fichier de l'aggregat monetaire BRH,ensuite nous ferons le nettoyage du dataframe.
+
+```{r,message=F, warning=FALSE, echo=FALSE }
+
+url("https://www.brh.ht/wp-content/uploads/agregatsmon.xls")
+setwd(file.path("/Applications/Devoir Marthe Manipulation"))
+local<-file.path("Brh_Data.xls")
+download.file("https://www.brh.ht/wp-content/uploads/agregatsmon.xls",local)
+Brh_Data<-read_excel(local, skip = 2)
+
+
+# changer le nom da la 1ere colonne en date
+Brh_Data<-rename(Brh_Data, Date = ...1)
+
+#Eliminer les colonnes et les lignes inutiles
+Brh_Data<-Brh_Data[1:518, ]
+Brh_Data<-Brh_Data[-c(1), ]
+Brh_Data<-Brh_Data[,-c(5)]
+Brh_Data<-Brh_Data[,-c(8)]
+Brh_Data<-Brh_Data[,-c(9)]
+Brh_Data<-Brh_Data[,-c(12)]
+Brh_Data<-Brh_Data[,-c(16)]
+Brh_Data<-Brh_Data[,-c(18)]
+Brh_Data<-Brh_Data[,-c(19)]
+Brh_Data<-Brh_Data[,-c(23)]
+Brh_Data<-Brh_Data[,-c(27)]
+Brh_Data<-Brh_Data[,-c(38)]
+Brh_Data<-Brh_Data[,-c(46)]
+Brh_Data<-Brh_Data[,-c(33)]
+
+str(Brh_Data)
+# conversion date en format numerique
+Brh_Data$Date <- as.numeric(Brh_Data$Date)
+
+# Conversion la colonne date en format correct, en prenant 30 decembre comme point de depart
+Brh_Data$Date <- as.Date(Brh_Data$Date, 
+                                 origin = "1899-12-30")
+
+# Formattage des 17 dates manquantes
+# Hint: taper les valeurs en observant le fichier excel 
+
+Brh_Data$Date[309] <- "2004-07-01"
+Brh_Data$Date[310] <- "2004-08-01"
+Brh_Data$Date[311] <- "2004-09-01"
+Brh_Data$Date[312] <- "2004-10-01"
+Brh_Data$Date[313] <- "2004-11-01"
+Brh_Data$Date[314] <- "2004-12-01"
+Brh_Data$Date[315] <- "2005-01-01"
+Brh_Data$Date[316] <- "2005-02-01"
+Brh_Data$Date[317] <- "2005-03-01"
+Brh_Data$Date[318] <- "2005-04-01"
+Brh_Data$Date[319] <- "2005-05-01"
+Brh_Data$Date[320] <- "2005-06-01"
+
+Brh_Data$Date[360] <- "2008-10-01"
+Brh_Data$Date[361] <- "2008-11-01"
+Brh_Data$Date[362] <- "2008-12-01"
+Brh_Data$Date[363] <- "2009-01-01"
+Brh_Data$Date[364] <- "2009-02-01"
+
+#Creer un objet comportant tous les colonnes de donnees du fichier de octobre 1990 a date
+Brh_Data <- Brh_Data %>% 
+  filter(Date >= "1990-10-01")
+
+```
+
+## Le choix des troix (3) variables
+
+Dans le Dataframe Brh_data, on a pris les variables Masse monetaire en circulation,Base monetaire Gourde, et Base monetaire Dollars. J'ai due changer le nom de mes variables. Afin d'extraire les donnes de ces 3 variables dans le data frame, on utilise la fonction "Select".
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
+#CHoix des variables
+Brh_variable<-Brh_Data%>%
+  select("Date","MONNAIE EN CICULATION","BASE MONETAIRE...12","BASE MONETAIRE...13")
+
+
+str(Brh_variable)
+
+# convertir en donnee numeri
+Brh_variable$`BASE MONETAIRE...12`<-as.numeric(Brh_variable$`BASE MONETAIRE...12`)
+Brh_variable$`BASE MONETAIRE...13`<-as.numeric(Brh_variable$`BASE MONETAIRE...13`)
+Brh_variable$`MONNAIE EN CICULATION`<- as.numeric(Brh_variable$`MONNAIE EN CICULATION`)
+
+
+# changer le nom des colonnes
+names(Brh_variable)<-c("Date","MEC","BMGourde", "BMDollars")
+
+
+
+```
+
+## Test
+
+On a tester si les variables sont stationnaires et aussi fait le teste de causalite de Granger. En fonction de ce teste, nous avons fait une regression lineaire multiple de la variable MEC par rapport à BMGOURDE et BMDOLLARS.
+
+```{r, message=F, warning=FALSE, echo=FALSE }
+## Teste de stationarite pour les variables
+ggplot(Brh_variable, aes(x = Date, y = BMGourde))+
+  geom_line()+
+  labs(title = " BASE MONETAIRE GOURDE",
+       subtitle = "Periode: Octobre 1990 - Octobre 2021")
+
+adf.test(Brh_variable$BMGourde)
+```
+
+```{r, message=F, warning=FALSE, echo=FALSE }
+ggplot(Brh_variable, aes(x = Date, y = BMDollars))+
+  geom_line()+
+  labs(title = "BASE MONETAIRE DOLLARS",
+       y = "BMDOLLARS",
+       subtitle = "Periode: Octobre 1990 - Octobre 2021")
+
+adf.test(Brh_variable$BMDollars)
+```
+
+```{r, message=F, warning=FALSE, echo=FALSE }
+ggplot(Brh_variable, aes(x = Date, y =MEC))+
+  geom_line()+
+  labs(title = "MONNAIE EN CICULATION",
+       y = "MEC",
+       subtitle = "Periode: Octobre 1990 - Octobre 2021")
+
+
+
+adf.test(Brh_variable$MEC)
+```
+
+```{r, message=F, warning=FALSE, echo=FALSE }
+A <- diff(Brh_variable$BMGourde)
+plot(A, ylab = "BMGOURDE")
+adf.test(A)
+
+```
+
+```{r, message=F, warning=FALSE, echo=FALSE}
+
+B <- diff(Brh_variable$BMDollars)
+plot(B, ylab = "BMDOLLARS")
+adf.test(B)
+
+```
+
+```{r, message=F, warning=FALSE, echo=FALSE }
+C <- diff(Brh_variable$MEC)
+plot(C, ylab = "MEC")
+adf.test(C)
+```
+
+```{r, message=F, warning=FALSE, echo=FALSE }
+# Test de la causalite de Granger
+grangertest(MEC ~ BMGourde, data = Brh_variable, order = 1)
+grangertest(MEC ~ BMDollars, data = Brh_variable, order = 2)
+
+```
+
+```{r, message=F, warning=FALSE, echo=FALSE}
+# Regression lineaire sur la teste de la causalite de granger       
+library(readr)
+reg_brh_variable<-lm(MEC~BMGourde+BMDollars, data = Brh_variable)
+summary(reg_brh_variable)
+
+
+
+```
+
+# Conclusion
+
+En somme, nous avons fait l'analyse de ces 3 trois variables, a travers le test de stationnarite, le test de la causalite de Granger.
+
+:
